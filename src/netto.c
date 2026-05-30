@@ -33,11 +33,16 @@
 #include <getopt.h>
 #include <unistd.h>
 #include <signal.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <libgen.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 
 #include "version.h"
 #include "config.h"
 #include "process.h"
+#include "shm_logger.h"
 
 // ==== DEFINES / MACROS ======================================================
 // ==== TYPEDEFS / STRUCTS ====================================================
@@ -60,6 +65,10 @@ static void show_usage(void);
 static bool is_running(pid_t *pid);
 static void sig_handler(int signum);
 static int setup_signals(void);
+static int write_pid_file(void);
+static int chdir_to_executable(void);
+static int initialize(void);
+static void finalize(void);
 
 // ==== FUNCTIONS =============================================================
 
@@ -82,16 +91,21 @@ int main(int argc, char *argv[])
         exit(EXIT_SUCCESS);
     }
 
+	if (chdir_to_executable() != 0) {
+		fprintf(stderr, "[ERROR] Failed to change directory to executable\n");
+		exit(EXIT_FAILURE);
+	}
+
     while ((opt = getopt_long(argc, argv, "hv", g_options, &opt_idx)) != -1) {
         switch (opt) {
-        case 'h':
-            show_usage();
-            exit(EXIT_SUCCESS);
-        case 'v':
-            show_version();
-            exit(EXIT_SUCCESS);
-        default:
-            break;
+			case 'h':
+				show_usage();
+				exit(EXIT_SUCCESS);
+			case 'v':
+				show_version();
+				exit(EXIT_SUCCESS);
+			default:
+				break;
         }
     }
 
@@ -132,8 +146,17 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	if (write_pid_file() != 0) {
+		fprintf(stderr, "[ERROR] Failed to write PID file\n");
+		exit(EXIT_FAILURE);
+	}
+
 	if (setup_signals() != 0) {
 		fprintf(stderr, "[ERROR] Failed to setup signal handlers\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if (initialize() != 0) {
 		exit(EXIT_FAILURE);
 	}
 
@@ -142,6 +165,8 @@ int main(int argc, char *argv[])
 	while (g_config.running) {
 		sleep(1);
 	}
+
+	finalize();
 
     return 0;
 }
@@ -290,4 +315,72 @@ static int setup_signals(void)
 	}
 
 	return 0;
+}
+
+/**
+ * @brief PID 파일에 현재 프로세스 ID를 기록하는 함수
+ * 
+ * @return int 성공 시 0, 실패 시 -1
+ */
+static int write_pid_file(void)
+{
+	FILE *fp = NULL;
+
+	if (mkdir(VAR_DIR, 0755) != 0 && errno != EEXIST) {
+		return -1;
+	}
+
+	fp = fopen(PID_PATH, "w");
+	if (fp == NULL) {
+		return -1;
+	}
+
+	fprintf(fp, "%d\n", (int)getpid());
+	fclose(fp);
+
+	return 0;
+}
+
+/**
+ * @brief 실행 파일이 위치한 디렉토리로 현재 작업 디렉토리를 변경하는 함수
+ * 
+ * @return int 성공 시 0, 실패 시 -1
+ */
+static int chdir_to_executable(void)
+{
+	char exe_path[BUF_SIZE_256] = {0};
+
+	if (readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1) <= 0) {
+		return -1;
+	}
+
+	char *dir = dirname(exe_path);
+	if (chdir(dir) != 0) {
+		return -1;
+	}
+
+	return 0;
+}
+
+/**
+ * @brief 초기화 함수
+ * 
+ * @return int 성공 시 0, 실패 시 -1
+ */
+static int initialize(void)
+{
+	if (init_daemon_logger_consumer() != 0) {
+		fprintf(stderr, "[ERROR] Failed to initialize daemon logger consumer\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+/**
+ * @brief 종료 함수
+ */
+static void finalize(void)
+{
+	destroy_logger(LOG_TYPE_DAEMON, true);
 }
