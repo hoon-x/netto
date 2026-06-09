@@ -18,33 +18,62 @@
 // ==== DESCRIPTION ===========================================================
 
 /**
- * @file    file.h
+ * @file    mpmc_queue.h
  * @author  JongHoon Shim (shim9532@gmail.com)
- * @date    2026-05-10
- * @brief   파일 유틸리티 헤더 파일
+ * @date    2026-06-07
+ * @brief   락 프리 MPMC 큐 구현 헤더 파일
  */
 
-#ifndef _FILE_H
-#define _FILE_H
+#ifndef _MPMC_QUEUE_H
+#define _MPMC_QUEUE_H
 
 // ==== INCLUDES ==============================================================
 
-#include <sys/types.h>
+#include <stddef.h>
+#include <stdbool.h>
 
 // ==== DEFINES / MACROS ======================================================
 // ==== TYPEDEFS / STRUCTS ====================================================
+
+typedef struct mpmc_queue mpmc_queue_t;
+
 // ==== GLOBAL VARIABLES ======================================================
 // ==== STATIC VARIABLES ======================================================
 // ==== FUNCTION PROTOTYPES ===================================================
 
 /**
- * @brief   디렉토리를 재귀적으로 생성하는 함수
- * @param   path    생성할 디렉토리 경로
- * @param   mode    디렉토리 생성 시 사용할 권한
- * @return  성공 시 0, 실패 시 -1
+ * @brief 락 프리 MPMC 큐 초기화 함수
+ * 
+ * @param cap 큐의 용량 (항상 2의 거듭제곱이어야 함)
+ * @return 초기화된 MPMC 큐 포인터, 실패 시 NULL
  */
-int mkdir_p(const char *path, mode_t mode);
+mpmc_queue_t *init_mpmc_queue(size_t cap);
+
+/**
+ * @brief 락 프리 MPMC 큐 메모리 해제 함수
+ * 
+ * @param q 해제할 MPMC 큐 포인터
+ */
+void free_mpmc_queue(mpmc_queue_t *q);
+
+/**
+ * @brief 락 프리 MPMC 큐에 데이터를 추가하는 함수
+ * 
+ * @param q 데이터를 추가할 MPMC 큐 포인터
+ * @param data 추가할 데이터 포인터
+ * @return true(성공), false(큐가 가득 찼거나 오류 발생)
+ */
+bool enqueue_mpmc(mpmc_queue_t *q, void *data);
+
+/**
+ * @brief 락 프리 MPMC 큐에서 데이터를 가져오는 함수
+ * 
+ * @param q 데이터를 추가할 MPMC 큐 포인터
+ * @param data 가져온 데이터가 저장될 포인터
+ * @return true(성공), false(가져올 데이터가 없음)
+ */
+bool dequeue_mpmc(mpmc_queue_t *q, void **data);
 
 // ==== FUNCTIONS =============================================================
 
-#endif /* _FILE_H */
+#endif /* _MPMC_QUEUE_H */

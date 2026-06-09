@@ -18,11 +18,14 @@
 // ==== DESCRIPTION ===========================================================
 
 /**
- * @file    shm_logger.h
+ * @file    logger.h
  * @author  JongHoon Shim (shim9532@gmail.com)
- * @date    2026-05-15
- * @brief   공유 메모리 로깅 유틸리티 헤더 파일
+ * @date    2026-06-02
+ * @brief   로깅 유틸리티 헤더 파일
  */
+
+#ifndef _LOGGER_H
+#define _LOGGER_H
 
 // ==== INCLUDES ==============================================================
 // ==== DEFINES / MACROS ======================================================
@@ -54,38 +57,17 @@ typedef enum log_level {
 // ==== GLOBAL VARIABLES ======================================================
 // ==== STATIC VARIABLES ======================================================
 // ==== FUNCTION PROTOTYPES ===================================================
+
+/**
+ * @brief   데몬 로거 초기화
+ * @param   log_path        로그 파일 경로
+ * @param   max_log_size    최대 로그 사이즈 (단위: MB)
+ * @param   max_backup      로그 파일 백업 개수
+ * @param   debug           디버그 모드 플래그
+ * @return  성공 시 0, 실패 시 -1
+ */
+int init_daemon_logger(const char *log_path, int max_log_size, int max_backup, bool debug);
+
 // ==== FUNCTIONS =============================================================
 
-/**
- * @brief Daemon 로거 consumer 초기화
- * @return int 초기화 성공 시 0, 실패 시 -1
- */
-int init_daemon_logger_consumer(void);
-
-/**
- * @brief Daemon 로거 producer 초기화
- * @return int 초기화 성공 시 0, 실패 시 -1
- */
-int init_daemon_logger_producer(void);
-
-/**
- * @brief 로거 리소스 해제
- * @param type 로그 타입
- * @param is_consumer consumer인지 여부
- */
-void destroy_logger(log_type_t type, bool is_consumer);
-
-/**
- * @brief Daemon 로그 작성
- * @param level 로그 레벨
- * @param fmt 포맷 문자열
- * @param ... 가변 인자
- */
-void write_daemon_log(log_level_t level, const char *fmt, ...);
-
-/**
- * @brief Daemon 로그 consumer 스레드 함수
- * @param arg 스레드 인자
- * @return void * 스레드 반환 값
- */
-void *daemon_log_consumer_thread(void *arg);
+#endif /* _LOGGER_H */

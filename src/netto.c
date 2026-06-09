@@ -42,7 +42,7 @@
 #include "version.h"
 #include "config.h"
 #include "process.h"
-#include "shm_logger.h"
+#include "logger.h"
 
 // ==== DEFINES / MACROS ======================================================
 // ==== TYPEDEFS / STRUCTS ====================================================
@@ -369,10 +369,7 @@ static int chdir_to_executable(void)
  */
 static int initialize(void)
 {
-	if (init_daemon_logger_consumer() != 0) {
-		fprintf(stderr, "[ERROR] Failed to initialize daemon logger consumer\n");
-		return -1;
-	}
+	
 
 	return 0;
 }
@@ -382,5 +379,5 @@ static int initialize(void)
  */
 static void finalize(void)
 {
-	destroy_logger(LOG_TYPE_DAEMON, true);
+
 }

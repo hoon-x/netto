@@ -24,6 +24,9 @@
  * @brief   시간 관련 유틸리티 헤더 파일
  */
 
+#ifndef _NT_TIME_H
+#define _NT_TIME_H
+
 // ==== INCLUDES ==============================================================
 
 #include <stdint.h>
@@ -41,3 +44,5 @@
  * @return uint64_t 현재 시간 (나노초)
  */
 uint64_t get_now_time_ns(void);
+
+#endif /* _NT_TIME_H */
