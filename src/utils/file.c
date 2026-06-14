@@ -33,7 +33,6 @@
 #include <sys/stat.h>
 
 #include "file.h"
-#include "config.h"
 
 // ==== DEFINES / MACROS ======================================================
 // ==== TYPEDEFS / STRUCTS ====================================================

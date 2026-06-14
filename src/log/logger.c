@@ -38,8 +38,8 @@
 #include <sys/stat.h>
 
 #include "logger.h"
-#include "config.h"
 #include "nt_time.h"
+#include "macros.h"
 
 // ==== DEFINES / MACROS ======================================================
 

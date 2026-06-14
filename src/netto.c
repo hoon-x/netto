@@ -43,6 +43,7 @@
 #include "config.h"
 #include "process.h"
 #include "logger.h"
+#include "macros.h"
 
 // ==== DEFINES / MACROS ======================================================
 // ==== TYPEDEFS / STRUCTS ====================================================

@@ -37,7 +37,7 @@
 #include <sys/types.h>
 
 #include "process.h"
-#include "config.h"
+#include "macros.h"
 
 // ==== DEFINES / MACROS ======================================================
 // ==== TYPEDEFS / STRUCTS ====================================================
