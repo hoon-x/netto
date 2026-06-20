@@ -32,7 +32,7 @@
 #include <stdatomic.h>
 #include <stdalign.h>
 
-#include "mpmc_queue.h"
+#include "utils/mpmc_queue.h"
 #include "macros.h"
 
 // ==== DEFINES / MACROS ======================================================

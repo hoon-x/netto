@@ -36,7 +36,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "process.h"
+#include "utils/process.h"
 #include "macros.h"
 
 // ==== DEFINES / MACROS ======================================================

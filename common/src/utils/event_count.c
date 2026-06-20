@@ -36,7 +36,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "event_count.h"
+#include "utils/event_count.h"
 
 // ==== DEFINES / MACROS ======================================================
 

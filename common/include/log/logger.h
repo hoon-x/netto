@@ -38,12 +38,6 @@
 
 // ==== TYPEDEFS / STRUCTS ====================================================
 
-// 로그 타입 정의
-typedef enum log_type {
-    LOG_TYPE_DAEMON = 0,
-    LOG_TYPE_MAX
-} log_type_t;
-
 // 로그 레벨 정의
 typedef enum log_level {
     LOG_LVL_DEBUG = 0,
@@ -64,9 +58,15 @@ typedef enum log_level {
  * @param   max_log_size    최대 로그 사이즈 (단위: MB)
  * @param   max_backup      로그 파일 백업 개수
  * @param   debug           디버그 모드 플래그
- * @return  성공 시 0, 실패 시 -1
+ * @return  int             성공 시 0, 실패 시 -1
  */
 int init_daemon_logger(const char *log_path, int max_log_size, int max_backup, bool debug);
+
+/**
+ * @brief 데몬 로거 메모리 해제
+ * 
+ */
+void destroy_daemon_logger(void);
 
 // ==== FUNCTIONS =============================================================
 

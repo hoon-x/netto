@@ -1,94 +1,72 @@
-# Informations
-VERSION			:= 1.0.0
-GIT_HASH		:= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-BUILD_DATE		:= $(shell date +"%Y-%m-%d\ %H:%M:%S")
-OS_ID			:= $(shell grep -w "ID" /etc/os-release | cut -d'=' -f2 | tr -d '"')
-OS_VER			:= $(shell grep -w "VERSION_ID" /etc/os-release | cut -d'=' -f2 | tr -d '"')
-BUILD_OS		:= $(OS_ID)$(OS_VER)
-BUILD_KERN_VER	:= $(shell uname -r)
-BUILD_ARCH		:= $(shell uname -m)
+export VERSION			:= 1.0.0
+export GIT_HASH			:= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+export BUILD_DATE		:= $(shell date +"%Y-%m-%d\ %H:%M:%S")
+export OS_ID			:= $(shell grep -w "ID" /etc/os-release | cut -d'=' -f2 | tr -d '"')
+export OS_VER			:= $(shell grep -w "VERSION_ID" /etc/os-release | cut -d'=' -f2 | tr -d '"')
+export BUILD_OS			:= $(OS_ID)$(OS_VER)
+export BUILD_KERN_VER	:= $(shell uname -r)
+export BUILD_ARCH		:= $(shell uname -m)
 
-# Compiler & tools
-CC		:= gcc
-CLANG	:= clang
-BPFTOOL	:= bpftool
+export CC				:= gcc
+export CFLAGS			?= -Wall -Wextra -O2 -MMD -MP
 
-# Flags
-CFLAGS		:= -Wall -Wextra -O2 -Iinclude -Iskel
-BPF_CFLAGS	:= -O2 -g -target bpf -Iinclude
-LDFLAGS		:=
-LDLIBS		:= -lpthread -lbpf
+COMMON_DIR	:= common
+DAEMONS_DIR	:= daemons
+BIN_DIR		:= bin
 
-# Definitions
-CFLAGS	+=	-DVERSION=\"$(VERSION)\"				\
-			-DGIT_HASH=\"$(GIT_HASH)\"				\
-			-DBUILD_DATE=\"$(BUILD_DATE)\"			\
-			-DBUILD_OS=\"$(BUILD_OS)\"				\
-			-DBUILD_KERN_VER=\"$(BUILD_KERN_VER)\"	\
-			-DBUILD_ARCH=\"$(BUILD_ARCH)\"
+export ROOT_DIR			:= $(CURDIR)
+export COMMON_INC_DIR	:= $(ROOT_DIR)/$(COMMON_DIR)/include
+export COMMON_LIB		:= $(ROOT_DIR)/$(COMMON_DIR)/libcommon.a
 
-# Directories
-SRC_DIR		:= src
-OBJ_DIR 	:= obj
-BIN_DIR 	:= bin
-BPF_DIR 	:= bpf
-SKEL_DIR	:= skel
+MAKEFLAGS				+= --no-print-directory
 
-# Binary name
-TARGET	:= $(BIN_DIR)/netto
+DAEMONS		:= netto
 
-# BPF object & skeleton header
-BPF_SRC		:= $(BPF_DIR)/netto.bpf.c
-BPF_OBJ		:= $(BIN_DIR)/netto.bpf.o
-BPF_SKEL	:= $(SKEL_DIR)/netto.bpf.skel.h
+.PHONY: all clean release common collect $(DAEMONS)
 
-# Auto-discover all user-space sources (recursive)
-SRCS	:= $(shell find $(SRC_DIR) -name '*.c')
+all: $(DAEMONS) collect
 
-# Map src/**/*.c → obj/파일명.o (flat)
-OBJS	:= $(patsubst %.c, $(OBJ_DIR)/%.o, $(notdir $(SRCS)))
+common:
+	@echo "========================================"
+	@echo "--> Building Common Infrastructure..."
+	@echo "========================================"
+	$(MAKE) -C $(COMMON_DIR)
 
-# Dependency files
-DEPS		:= $(OBJS:.o=.d)
-BPF_DEPS	:= $(OBJ_DIR)/netto.bpf.d
+$(DAEMONS): common
+	@echo "========================================"
+	@echo "--> Building Daemon: $@"
+	@echo "========================================"
+	$(MAKE) -C $(DAEMONS_DIR)/$@
 
-# Register all source directories for vpath search
-vpath %.c $(sort $(dir $(SRCS)))
+collect:
+	@echo "========================================"
+	@echo "--> Collecting Build Artifacts into $(BIN_DIR)/"
+	@echo "========================================"
+	@mkdir -p $(BIN_DIR)
+	@for daemon in $(DAEMONS); do \
+		$(MAKE) -C $(DAEMONS_DIR)/$$daemon install DEST_DIR=$(ROOT_DIR)/$(BIN_DIR); \
+	done
 
-# =============================================================================
-.PHONY: all clean
-
-all: $(TARGET)
-
-# Link user-space binary
-$(TARGET): $(OBJS) | $(BIN_DIR)
-	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
-
-# Compile user-space objects (flat obj/)
-$(OBJ_DIR)/%.o: %.c $(BPF_SKEL) | $(OBJ_DIR)
-	$(CC) $(CFLAGS) -MMD -MP -o $@ -c $<
-
-# Compile BPF object
-$(BPF_OBJ): $(BPF_SRC) | $(BIN_DIR) $(OBJ_DIR)
-	$(CLANG) $(BPF_CFLAGS) -MMD -MP -MF $(BPF_DEPS) -o $@ -c $<
-
-# Generate skeleton header from BPF object
-$(BPF_SKEL): $(BPF_OBJ) | $(SKEL_DIR)
-	$(BPFTOOL) gen skeleton $< > $@
-
-# Create output directories
-$(OBJ_DIR):
-	mkdir -p $@
-
-$(BIN_DIR):
-	mkdir -p $@
-
-$(SKEL_DIR):
-	mkdir -p $@
-
-# Pull in header dependencies
--include $(DEPS)
--include $(BPF_DEPS)
+release: clean all
+	@echo "========================================"
+	@echo "--> Release Build Complete"
+	@echo "    VERSION:        $(VERSION)"
+	@echo "    GIT_HASH:       $(GIT_HASH)"
+	@echo "    BUILD_DATE:     $(BUILD_DATE)"
+	@echo "    OS_ID:          $(OS_ID)"
+	@echo "    OS_VER:         $(OS_VER)"
+	@echo "    BUILD_OS:       $(BUILD_OS)"
+	@echo "    BUILD_KERN_VER: $(BUILD_KERN_VER)"
+	@echo "    BUILD_ARCH:     $(BUILD_ARCH)"
+	@echo "========================================"
 
 clean:
-	rm -rf $(OBJ_DIR) $(BIN_DIR) $(SKEL_DIR)
+	@echo "--> Cleaning Common..."
+	$(MAKE) -C $(COMMON_DIR) clean
+	@for daemon in $(DAEMONS); do \
+		echo "--> Cleaning Daemon: $$daemon"; \
+		$(MAKE) -C $(DAEMONS_DIR)/$$daemon clean; \
+	done
+	@rm -rf $(BIN_DIR)
+	@echo "--> Clean complete."
+	

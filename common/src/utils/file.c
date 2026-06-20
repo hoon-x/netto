@@ -18,66 +18,77 @@
 // ==== DESCRIPTION ===========================================================
 
 /**
- * @file    logger.c
+ * @file    file.c
  * @author  JongHoon Shim (shim9532@gmail.com)
- * @date    2026-06-02
- * @brief   로깅 유틸리티 소스 파일
+ * @date    2026-05-10
+ * @brief   파일 유틸리티 소스 파일
  */
 
 // ==== INCLUDES ==============================================================
 
-#include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdarg.h>
-#include <string.h>
 #include <unistd.h>
-#include <time.h>
-#include <sys/types.h>
+#include <errno.h>
+#include <string.h>
 #include <sys/stat.h>
 
-#include "logger.h"
-#include "nt_time.h"
-#include "macros.h"
+#include "utils/file.h"
 
 // ==== DEFINES / MACROS ======================================================
-
-#define DEF_MAX_LOG_SIZE    (100 * 1024 * 1024)	// 100MB
-#define DEF_MAX_BACKUP      10
-
 // ==== TYPEDEFS / STRUCTS ====================================================
-
-// Daemon 로그 슬롯 구조체
-typedef struct daemon_log_slot {
-    uint64_t timestamp_ns;
-    uint32_t pid;
-    uint32_t level;
-    char msg[BUF_SIZE_1K];
-} daemon_log_slot_t;
-
-typedef struct daemon_logger {
-    FILE *fp;                       // 현재 로그 파일 포인터
-    char log_path[BUF_SIZE_256];    // 로그 파일 경로
-    size_t max_log_size;            // 최대 로그 파일 크기 (바이트)
-    int max_backup;                 // 최대 백업 파일 수
-} daemon_logger_t;
-
 // ==== GLOBAL VARIABLES ======================================================
 // ==== STATIC VARIABLES ======================================================
-
-static daemon_logger_t g_daemon_logger;
-
 // ==== FUNCTION PROTOTYPES ===================================================
 // ==== FUNCTIONS =============================================================
 
-int init_daemon_logger(const char *log_path, int max_log_size, int max_backup, bool debug)
+int mkdir_p(const char *path, mode_t mode)
 {
-    
+    if (path == NULL || *path == '\0') {
+        return -1;
+    }
 
+    char *buf = strdup(path);
+    if (buf == NULL) {
+        return -1;
+    }
 
-    return 0;
+    // trailing '/' 제거 (예: "/a/b/c/" → "/a/b/c")
+    size_t len = strlen(buf);
+    while (len > 0 && buf[len - 1] == '/') {
+        buf[--len] = '\0';
+    }
+
+    // path가 '/'로만 이루어진 경우 (예: "///") - 이미 존재하므로 성공 반환
+    if (len == 0) {
+        free(buf);
+        return 0;
+    }
+
+    for (char *p = buf + 1; *p != '\0'; p++) {
+        if (*p == '/') {
+            // 연속 슬래시 스킵: "/a//b"
+            if (*(p + 1) == '/') {
+                continue;
+            }
+
+            *p = '\0';
+
+            if (mkdir(buf, mode) != 0 && errno != EEXIST) {
+                free(buf);
+                return -1;
+            }
+
+            *p = '/';
+        }
+    }
+
+    int ret = 0;
+
+    if (mkdir(buf, mode) != 0 && errno != EEXIST) {
+        ret = -1;
+    }
+
+    free(buf);
+    return ret;
 }
-
-
 

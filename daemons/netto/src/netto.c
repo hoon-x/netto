@@ -41,8 +41,8 @@
 
 #include "version.h"
 #include "config.h"
-#include "process.h"
-#include "logger.h"
+#include "utils/process.h"
+#include "log/logger.h"
 #include "macros.h"
 
 // ==== DEFINES / MACROS ======================================================
@@ -68,7 +68,7 @@ static void sig_handler(int signum);
 static int setup_signals(void);
 static int write_pid_file(void);
 static int chdir_to_executable(void);
-static int initialize(void);
+static int initialize(bool debug);
 static void finalize(void);
 
 // ==== FUNCTIONS =============================================================
@@ -147,17 +147,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (write_pid_file() != 0) {
-		fprintf(stderr, "[ERROR] Failed to write PID file\n");
-		exit(EXIT_FAILURE);
-	}
-
-	if (setup_signals() != 0) {
-		fprintf(stderr, "[ERROR] Failed to setup signal handlers\n");
-		exit(EXIT_FAILURE);
-	}
-
-	if (initialize() != 0) {
+	if (initialize(is_debug) != 0) {
 		exit(EXIT_FAILURE);
 	}
 
@@ -366,11 +356,26 @@ static int chdir_to_executable(void)
 /**
  * @brief 초기화 함수
  * 
+ * @param debug 디버그 모드 여부
+ * 
  * @return int 성공 시 0, 실패 시 -1
  */
-static int initialize(void)
+static int initialize(bool debug)
 {
-	
+	if (write_pid_file() != 0) {
+		fprintf(stderr, "[ERROR] Failed to write PID file\n");
+		return -1;
+	}
+
+	if (setup_signals() != 0) {
+		fprintf(stderr, "[ERROR] Failed to setup signal handlers\n");
+		return -1;
+	}
+
+	if (init_daemon_logger(LOG_PATH, 10, 10, debug) != 0) {
+		fprintf(stderr, "[ERROR] Failed to initialize daemon logger\n");
+		return -1;
+	}
 
 	return 0;
 }
@@ -380,5 +385,5 @@ static int initialize(void)
  */
 static void finalize(void)
 {
-
+	destroy_daemon_logger();
 }
