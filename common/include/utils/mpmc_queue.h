@@ -40,15 +40,15 @@ typedef struct mpmc_queue mpmc_queue_t;
 /**
  * @brief 예약된 queue 슬롯에 대한 정보를 저장하는 구조체
  * 
- * reserve_mpmc()에 의해 채워지며, 소비자가 데이터를 직접 처리한 후
- * commit_mpmc()를 호출하여 슬롯을 큐에 반환할 때 사용.
+ * reserve_enqueue(dequeue)_mpmc()에 의해 채워지며, 소비자가 데이터를 직접 처리한 후
+ * commit_enqueue(dequeue)_mpmc()를 호출하여 슬롯을 큐에 반환할 때 사용.
  * 
  * 본 구조체의 내용은 사용자가 직접 수정해서는 안 되며,
- * reserve_mpmc()와 commit_mpmc() 사이에서만 유효.
+ * reserve_enqueue(dequeue)_mpmc()와 commit_enqueue(dequeue)_mpmc() 사이에서만 유효.
  * 
  * @warning
- * 동일한 reserved_slot_t에 대해 commit_mpmc()를 두 번 이상 호출하거나,
- * reserve_mpmc()를 다시 호출하기 전에 기존 슬롯이 commit되지 않은 상태에서
+ * 동일한 reserved_slot_t에 대해 commit_enqueue(dequeue)_mpmc()를 두 번 이상 호출하거나,
+ * reserve_enqueue(dequeue)_mpmc()를 다시 호출하기 전에 기존 슬롯이 commit되지 않은 상태에서
  * 구조체를 재사용하면 정의되지 않은 동작(undefined behavior)이 발생할 수 있음.
  */
 typedef struct reserved_slot {
@@ -185,13 +185,23 @@ bool enqueue_mpmc(mpmc_queue_t *q, void *data);
 bool dequeue_mpmc(mpmc_queue_t *q, void *data);
 
 /**
- * @brief Queue의 다음 항목을 예약하고 슬롯 정보 반환
+ * @brief Enqueue의 다음 항목을 예약하고 슬롯 정보 반환
+ * 
+ * @param q MPMC Queue 구조체 포인터
+ * @param res 예약된 슬롯 정보를 저장할 구조체
+ * @return true 슬롯 예약 성공
+ * @return false 슬롯 예약 실패
+ */
+bool reserve_enqueue_mpmc(mpmc_queue_t *q, reserved_slot_t *res);
+
+/**
+ * @brief Dequeue의 다음 항목을 예약하고 슬롯 정보 반환
  * 
  * 락 프리 MPMC(Multi-Producer Multi-Consumer) 큐에서 다음 항목을 제거 대상으로
  * 선점(reserve)하고, 해당 슬롯의 정보를 반환.
  * 
  * 예약에 성공하면 슬롯에 저장된 데이터는 res->data를 통해 직접 접근할 수 있으며,
- * 작업이 완료된 후 반드시 commit_mpmc()를 호출하여 슬롯을 큐에 반환해야 함.
+ * 작업이 완료된 후 반드시 commit_dequeue_mpmc()를 호출하여 슬롯을 큐에 반환해야 함.
  * 
  * 내부적으로 sequence 번호와 CAS(compare-and-swap)를 사용하여
  * 다중 consumer 환경에서도 락 없이 안전하게 동작.
@@ -208,68 +218,75 @@ bool dequeue_mpmc(mpmc_queue_t *q, void *data);
  * @return false 슬롯 예약 실패
  * 
  * @warning
- * reserve_mpmc()가 성공한 경우, 작업이 완료된 후 반드시
- * commit_mpmc()를 호출해야 함.
+ * reserve_dequeue_mpmc()가 성공한 경우, 작업이 완료된 후 반드시
+ * commit_dequeue_mpmc()를 호출해야 함.
  * 
  * @code
  * reserved_slot_t res;
  *
- * if (reserve_mpmc(q, &res)) {
+ * if (reserve_dequeue_mpmc(q, &res)) {
  *     my_data_t *data = (my_data_t *)res.data;
  *
  *     // 데이터 처리
  *     process(data);
  *
  *     // 반드시 슬롯 반환
- *     commit_mpmc(q, &res);
+ *     commit_dequeue_mpmc(q, &res);
  * }
  * @endcode
  */
-bool reserve_mpmc(mpmc_queue_t *q, reserved_slot_t *res);
-
+bool reserve_dequeue_mpmc(mpmc_queue_t *q, reserved_slot_t *res);
 
 /**
- * @brief 예약된 슬롯의 처리를 완료하고 queue에 반환
+ * @brief Enqueue 예약된 슬롯의 처리를 완료하고 queue에 반환
  * 
- * reserve_mpmc()를 통해 선점한 슬롯의 처리가 완료되었음을 알리고,
+ * @param q MPMC Queue 구조체 포인터
+ * @param res reserve_enqueue_mpmc()를 통해 획득한 예약 슬롯 정보
+ */
+void commit_enqueue_mpmc(mpmc_queue_t *q, reserved_slot_t *res);
+
+/**
+ * @brief Dequeue 예약된 슬롯의 처리를 완료하고 queue에 반환
+ * 
+ * reserve_dequeue_mpmc()를 통해 선점한 슬롯의 처리가 완료되었음을 알리고,
  * 해당 슬롯을 다시 큐에서 재사용할 수 있도록 반환.
  * 
  * 내부적으로 sequence 번호를 갱신하여 생산자(enqueue)가 해당 슬롯을
  * 다시 사용할 수 있도록 함.
  * 
  * @param q MPMC Queue 구조체 포인터
- * @param res reserve_mpmc()를 통해 획득한 예약 슬롯 정보
+ * @param res reserve_dequeue_mpmc()를 통해 획득한 예약 슬롯 정보
  * 
  * @note
- * 본 함수는 reserve_mpmc()가 성공한 이후에만 호출해야 함
+ * 본 함수는 reserve_dequeue_mpmc()가 성공한 이후에만 호출해야 함
  * 
  * @warning
- * reserve_mpmc()가 성공한 경우, 반드시 대응되는 commit_mpmc()를 호출해야 함.
+ * reserve_dequeue_mpmc()가 성공한 경우, 반드시 대응되는 commit_dequeue_mpmc()를 호출해야 함.
  * 
- * commit_mpmc()를 호출하지 않으면 해당 슬롯은 영구적으로 반환되지 않으며,
+ * commit_dequeue_mpmc()를 호출하지 않으면 해당 슬롯은 영구적으로 반환되지 않으며,
  * 사용 가능한 슬롯 수가 점차 감소하여 결국 큐가 가득 찬 상태에 도달할 수 있음.
  * 
  * @warning
- * 동일한 reserved_slot_t에 대해 commit_mpmc()를 두 번 이상 호출하면
+ * 동일한 reserved_slot_t에 대해 commit_dequeue_mpmc()를 두 번 이상 호출하면
  * 정의되지 않은 동작(undefined behavior)이 발생할 수 있음
  * 
  * @code
  * reserved_slot_t res;
  *
- * if (reserve_mpmc(q, &res)) {
+ * if (reserve_dequeue_mpmc(q, &res)) {
  *     my_data_t *data = (my_data_t *)res.data;
  *
  *     // 데이터 처리
  *     process(data);
  *
  *     // 슬롯 반환
- *     commit_mpmc(q, &res);
+ *     commit_dequeue_mpmc(q, &res);
  * }
  * @endcode
  * 
- * @see reserve_mpmc()
+ * @see reserve_dequeue_mpmc()
  */
-void commit_mpmc(mpmc_queue_t *q, reserved_slot_t *res);
+void commit_dequeue_mpmc(mpmc_queue_t *q, reserved_slot_t *res);
 
 // ==== FUNCTIONS =============================================================
 

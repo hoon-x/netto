@@ -24,6 +24,9 @@
  * @brief   매크로 정의 헤더 파일
  */
 
+#ifndef _MACROS_H
+#define _MACROS_H
+
 // ==== INCLUDES ==============================================================
 // ==== DEFINES / MACROS ======================================================
 
@@ -43,6 +46,7 @@
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 #define CLOSE_FD(fd) do { if ((fd) >= 0) { close(fd); (fd) = -1; } } while (0)
+#define FCLOSE(fp) do { if ((fp) != NULL) { fclose(fp); (fp) = NULL; } } while (0)
 #define MEM_FREE(ptr) do { free(ptr); (ptr) = NULL; } while (0)
 #define ALIGN_UP_SAFE(x, align) (((x) + (typeof(x))(align) - 1) & ~((typeof(x))(align) - 1))
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
@@ -53,3 +57,5 @@
 // ==== STATIC VARIABLES ======================================================
 // ==== FUNCTION PROTOTYPES ===================================================
 // ==== FUNCTIONS =============================================================
+
+#endif // _MACROS_H

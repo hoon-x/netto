@@ -28,24 +28,27 @@
 #define _LOGGER_H
 
 // ==== INCLUDES ==============================================================
+
+#include "threads/thread_mgr.h"
+
 // ==== DEFINES / MACROS ======================================================
 
-#define LOG_DEBUG(fmt, ...) write_daemon_log(LOG_LVL_DEBUG, "[%s():%d] ", __FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
-#define LOG_INFO(fmt, ...) write_daemon_log(LOG_LVL_INFO, fmt, ##__VA_ARGS__)
-#define LOG_WARN(fmt, ...) write_daemon_log(LOG_LVL_WARN, fmt, ##__VA_ARGS__)
-#define LOG_ERROR(fmt, ...) write_daemon_log(LOG_LVL_ERROR, fmt, ##__VA_ARGS__)
-#define LOG_FATAL(fmt, ...) write_daemon_log(LOG_LVL_FATAL, fmt, ##__VA_ARGS__)
+#define LOG_DEBUG(fmt, ...) enqueue_daemon_log(LEVEL_DEBUG, "[%s():%d] ", __FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
+#define LOG_INFO(fmt, ...) enqueue_daemon_log(LEVEL_INFO, fmt, ##__VA_ARGS__)
+#define LOG_WARN(fmt, ...) enqueue_daemon_log(LEVEL_WARN, fmt, ##__VA_ARGS__)
+#define LOG_ERROR(fmt, ...) enqueue_daemon_log(LEVEL_ERROR, fmt, ##__VA_ARGS__)
+#define LOG_FATAL(fmt, ...) enqueue_daemon_log(LEVEL_FATAL, fmt, ##__VA_ARGS__)
 
 // ==== TYPEDEFS / STRUCTS ====================================================
 
 // 로그 레벨 정의
 typedef enum log_level {
-    LOG_LVL_DEBUG = 0,
-    LOG_LVL_INFO,
-    LOG_LVL_WARN,
-    LOG_LVL_ERROR,
-    LOG_LVL_FATAL,
-    LOG_LVL_MAX
+    LEVEL_DEBUG = 0,
+    LEVEL_INFO,
+    LEVEL_WARN,
+    LEVEL_ERROR,
+    LEVEL_FATAL,
+    LEVEL_MAX
 } log_level_t;
 
 // ==== GLOBAL VARIABLES ======================================================
@@ -56,7 +59,7 @@ typedef enum log_level {
  * @brief   데몬 로거 초기화
  * @param   log_path        로그 파일 경로
  * @param   max_log_size    최대 로그 사이즈 (단위: MB)
- * @param   max_backup      로그 파일 백업 개수
+ * @param   max_backup      로그 파일 백업 개수 (0이면 백업 안함)
  * @param   debug           디버그 모드 플래그
  * @return  int             성공 시 0, 실패 시 -1
  */
@@ -67,6 +70,31 @@ int init_daemon_logger(const char *log_path, int max_log_size, int max_backup, b
  * 
  */
 void destroy_daemon_logger(void);
+
+/**
+ * @brief 데몬 로그 수집 쓰레드
+ * 
+ * @param self 자신의 쓰레드 관리 정보 구조체
+ * @return void* NULL
+ */
+void *daemon_log_consumer_thread(thread_mgr_t *self);
+
+/**
+ * @brief 데몬 로그 수집 쓰레드 깨우는 함수
+ * 
+ * 종료 신호를 받았을 때, 쓰레드가 sleep 상태면 깨워줌
+ * 
+ * @param self 자신의 쓰레드 관리 정보 구조체
+ */
+void wake_daemon_log_consumer_thread(thread_mgr_t *self);
+
+/**
+ * @brief MPMC 큐에 로그를 삽입하는 함수
+ * 
+ * @param level 로그 레벨
+ * @param fmt 로그 메시지
+ */
+void enqueue_daemon_log(log_level_t level, const char *fmt, ...);
 
 // ==== FUNCTIONS =============================================================
 

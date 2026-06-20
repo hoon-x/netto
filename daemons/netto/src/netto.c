@@ -59,6 +59,10 @@ static struct option g_options[] = {
     {0,0,0,0}
 };
 
+static thread_mgr_t g_threads[] = {
+	THREAD_ENTRY("deamon_log_thread", daemon_log_consumer_thread, NULL, wake_daemon_log_consumer_thread),
+};
+
 // ==== FUNCTION PROTOTYPES ===================================================
 
 static void show_version(void);
@@ -152,10 +156,13 @@ int main(int argc, char *argv[])
 	}
 
 	g_config.running = true;
+	LOG_INFO("Run %s (mode:%s)", NETTO_NAME, is_debug ? "debug" : "normal");
 
 	while (g_config.running) {
 		sleep(1);
 	}
+
+	LOG_INFO("Shutdown %s", NETTO_NAME);
 
 	finalize();
 
@@ -362,19 +369,38 @@ static int chdir_to_executable(void)
  */
 static int initialize(bool debug)
 {
+	int ret = -1;
+
+	// 자신의 PID를 파일에 기록
 	if (write_pid_file() != 0) {
 		fprintf(stderr, "[ERROR] Failed to write PID file\n");
 		return -1;
 	}
 
+	// 시그널 핸들링 설정
 	if (setup_signals() != 0) {
 		fprintf(stderr, "[ERROR] Failed to setup signal handlers\n");
 		return -1;
 	}
 
-	if (init_daemon_logger(LOG_PATH, 10, 10, debug) != 0) {
+	// 데몬 로거 초기화
+	if (init_daemon_logger(LOG_PATH, 10, 0, debug) != 0) {
 		fprintf(stderr, "[ERROR] Failed to initialize daemon logger\n");
 		return -1;
+	}
+
+	do {
+		// 등록된 모든 서비스 쓰레드 가동
+		if (start_thread_mgr_all(g_threads, ARRAY_SIZE(g_threads)) != 0) {
+			fprintf(stderr, "[ERROR] Failed to start threads\n");
+			break;	
+		}
+
+		ret = 0;
+	} while (0);
+	
+	if (ret != 0) {
+		destroy_daemon_logger();
 	}
 
 	return 0;
@@ -385,5 +411,9 @@ static int initialize(bool debug)
  */
 static void finalize(void)
 {
+	// 가동 중인 모든 서비스 쓰레드 종료
+	stop_thread_mgr_all(g_threads, ARRAY_SIZE(g_threads));
+
+	// 데몬 로거 해제
 	destroy_daemon_logger();
 }

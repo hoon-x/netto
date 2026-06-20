@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * Copyright 2026 Netto Project Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,6 +14,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * --------------------------------------------------------------------
+ * MODIFICATION NOTICE:
+ * This file is a C11 port of folly::EventCount, originally implemented
+ * in C++ as part of the Folly library (https://github.com/facebook/folly,
+ * folly/synchronization/EventCount.h).
+ * Ported and modified by JongHoon Shim (shim9532@gmail.com), June 2026.
  */
 
 // ==== DESCRIPTION ===========================================================

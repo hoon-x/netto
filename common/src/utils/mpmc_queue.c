@@ -53,7 +53,8 @@ struct mpmc_queue {
 // ==== STATIC VARIABLES ======================================================
 // ==== FUNCTION PROTOTYPES ===================================================
 
-static bool reserve_slot_internal(mpmc_queue_t *q, reserved_slot_t *res);
+static bool reserve_enqueue_slot_internal(mpmc_queue_t *q, reserved_slot_t *res);
+static bool reserve_dequeue_slot_internal(mpmc_queue_t *q, reserved_slot_t *res);
 
 // ==== FUNCTIONS =============================================================
 
@@ -70,14 +71,14 @@ mpmc_queue_t *create_mpmc_queue(size_t cap, size_t data_size)
     }
     memset(q, 0, sizeof(mpmc_queue_t));
 
-    // data_size가 0이면 포인터 저장 모드, 아니면 실제 데이터 크기 사용
-    size_t effective_data_size = (data_size == 0) ? sizeof(void *) : data_size;
     // 모드 구분을 위해 원래 값 저장
     q->data_size = data_size;
+    // data_size가 0이면 포인터 저장 모드, 아니면 실제 데이터 크기 사용
+    data_size = (data_size == 0) ? sizeof(void *) : data_size;
     // 각 슬롯 별 데이터 시작 위치
     q->data_offset = ALIGN_UP_SAFE(sizeof(atomic_size_t), alignof(max_align_t));
     // 각 슬롯의 stride 계산
-    q->slot_stride = ALIGN_UP_SAFE(q->data_offset + effective_data_size, CACHE_LINE_SIZE);
+    q->slot_stride = ALIGN_UP_SAFE(q->data_offset + data_size, CACHE_LINE_SIZE);
     q->slot_mask = cap - 1;
 
     q->slots = (char *)aligned_alloc(CACHE_LINE_SIZE, cap * q->slot_stride);
@@ -109,10 +110,95 @@ void destroy_mpmc_queue(mpmc_queue_t *q)
 
 bool enqueue_mpmc(mpmc_queue_t *q, void *data)
 {
+    reserved_slot_t res;
+
     if (q == NULL || data == NULL) {
         return false;
     }
 
+    if (!reserve_enqueue_slot_internal(q, &res)) {
+        return false;
+    }
+
+    // 데이터 삽입 방식 분기:
+    // 1. data_size == 0 이면 포인터 직접 저장 (대입 방식)
+    // 2. data_size > 0 이면 메모리 블록 복사 (memcpy 방식)
+    if (q->data_size == 0) {
+        *(void **)res.data = data;
+    }
+    else {
+        memcpy(res.data, data, q->data_size);
+    }
+
+    commit_enqueue_mpmc(q, &res);
+    return true;
+}
+
+bool dequeue_mpmc(mpmc_queue_t *q, void *data)
+{
+    reserved_slot_t res;
+
+    if (q == NULL || data == NULL) {
+        return false;
+    }
+
+    if (!reserve_dequeue_slot_internal(q, &res)) {
+        return false;
+    }
+
+    if (q->data_size == 0) {
+        *(void **)data = *(void **)res.data;
+    }
+    else {
+        memcpy(data, res.data, q->data_size);
+    }
+
+    commit_dequeue_mpmc(q, &res);
+    return true;
+}
+
+bool reserve_enqueue_mpmc(mpmc_queue_t *q, reserved_slot_t *res)
+{
+    if (q == NULL || res == NULL) {
+        return false;
+    }
+    return reserve_enqueue_slot_internal(q, res);
+}
+
+bool reserve_dequeue_mpmc(mpmc_queue_t *q, reserved_slot_t *res)
+{
+    if (q == NULL || res == NULL) {
+        return false;
+    }
+    return reserve_dequeue_slot_internal(q, res);
+}
+
+void commit_enqueue_mpmc(mpmc_queue_t *q, reserved_slot_t *res)
+{
+    if (q == NULL || res == NULL) {
+        return;
+    }
+    atomic_store_explicit((atomic_size_t *)res->slot, res->pos + 1, memory_order_release);
+}
+
+void commit_dequeue_mpmc(mpmc_queue_t *q, reserved_slot_t *res)
+{
+    if (q == NULL || res == NULL) {
+        return;
+    }
+    atomic_store_explicit((atomic_size_t *)res->slot, res->pos + q->slot_mask + 1, memory_order_release);
+}
+
+/**
+ * @brief Enqueue의 다음 슬롯을 내부적으로 선점
+ * 
+ * @param q MPMC Queue 구조체 포인터
+ * @param res 예약된 슬롯 정보를 저장할 구조체
+ * @return true 슬롯 선점 성공
+ * @return false 큐가 가득차서 선점할 수 있는 슬롯이 없음
+ */
+static bool reserve_enqueue_slot_internal(mpmc_queue_t *q, reserved_slot_t *res)
+{
     size_t pos = atomic_load_explicit(&q->enqueue_pos, memory_order_relaxed);
 
     while (true) {
@@ -126,22 +212,13 @@ bool enqueue_mpmc(mpmc_queue_t *q, void *data)
             if (atomic_compare_exchange_weak_explicit(&q->enqueue_pos, &pos, pos + 1,
                 memory_order_relaxed, memory_order_relaxed))
             {
-                // 데이터 삽입 방식 분기:
-                // 1. data_size == 0 이면 포인터 직접 저장 (대입 방식)
-                // 2. data_size > 0 이면 메모리 블록 복사 (memcpy 방식)
-                if (q->data_size == 0) {
-                    *(void **)(slot + q->data_offset) = data;
-                }
-                else {
-                    memcpy(slot + q->data_offset, data, q->data_size);
-                }
-
-                atomic_store_explicit(seq, pos + 1, memory_order_release);
+                res->data = slot + q->data_offset;
+                res->slot = slot;
+                res->pos = pos;
                 return true;
             }
         }
         else if (diff < 0) {
-            // 큐가 가득 참
             return false;
         }
         else {
@@ -151,54 +228,8 @@ bool enqueue_mpmc(mpmc_queue_t *q, void *data)
     }
 }
 
-bool dequeue_mpmc(mpmc_queue_t *q, void *data)
-{
-    if (q == NULL || data == NULL) {
-        return false;
-    }
-
-    reserved_slot_t res;
-
-    if (!reserve_slot_internal(q, &res)) {
-        return false;
-    }
-
-    if (q->data_size == 0) {
-        *(void **)data = *(void **)res.data;
-    }
-    else {
-        memcpy(data, res.data, q->data_size);
-    }
-
-    atomic_store_explicit((atomic_size_t *)res.slot, res.pos + q->slot_mask + 1, memory_order_release);
-
-    return true;
-}
-
-bool reserve_mpmc(mpmc_queue_t *q, reserved_slot_t *res)
-{
-    if (q == NULL || res == NULL) {
-        return false;
-    }
-
-    if (!reserve_slot_internal(q, res)) {
-        return false;
-    }
-
-    return true;
-}
-
-void commit_mpmc(mpmc_queue_t *q, reserved_slot_t *res)
-{
-    if (q == NULL || res == NULL) {
-        return;
-    }
-
-    atomic_store_explicit((atomic_size_t *)res->slot, res->pos + q->slot_mask + 1, memory_order_release);
-}
-
 /**
- * @brief Queue의 다음 슬롯을 내부적으로 선점
+ * @brief Dequeue의 다음 슬롯을 내부적으로 선점
  * 
  * dequeue_pos를 원자적으로 증가시켜 다음 소비 대상 슬롯을 확보하고,
  * 해당 슬롯에 대한 예약 정보를 res에 기록.
@@ -215,10 +246,10 @@ void commit_mpmc(mpmc_queue_t *q, reserved_slot_t *res)
  * 
  * @note
  * 슬롯을 성공적으로 획득한 경우, 해당 슬롯은 이후
- * commit_mpmc() 또는 dequeue_mpmc() 내부 처리에 의해
+ * commit_dequeue_mpmc() 또는 dequeue_mpmc() 내부 처리에 의해
  * 큐로 반환되어야 함.
  */
-static bool reserve_slot_internal(mpmc_queue_t *q, reserved_slot_t *res)
+static bool reserve_dequeue_slot_internal(mpmc_queue_t *q, reserved_slot_t *res)
 {
     size_t pos = atomic_load_explicit(&q->dequeue_pos, memory_order_relaxed);
 
