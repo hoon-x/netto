@@ -38,20 +38,32 @@ static void *thread_trampoline(void *raw);
 
 // ==== FUNCTIONS =============================================================
 
+void init_thread_mgr(thread_mgr_t *threads, size_t count)
+{
+    if (threads == NULL || count == 0) {
+        return;
+    }
+
+    for (size_t i = 0; i < count; i++) {
+        threads[i].tid = 0;
+        atomic_init(&threads[i].running, false);
+    }
+}
+
 int start_thread_mgr_one(thread_mgr_t *entry)
 {
     if (entry == NULL || entry->func == NULL) {
         return -1;
     }
 
-    if (entry->running) {
+    if (atomic_load_explicit(&entry->running, memory_order_relaxed)) {
         return -1;
     }
 
-    entry->running = true;
+    atomic_store_explicit(&entry->running, true, memory_order_relaxed);
 
     if (pthread_create(&entry->tid, NULL, thread_trampoline, entry) != 0) {
-        entry->running = false;
+        atomic_store_explicit(&entry->running, false, memory_order_relaxed);
         return -1;
     }
 
@@ -60,10 +72,10 @@ int start_thread_mgr_one(thread_mgr_t *entry)
 
 void stop_thread_mgr_one(thread_mgr_t *entry)
 {
-    if (entry == NULL || !entry->running) {
+    if (entry == NULL || !atomic_load_explicit(&entry->running, memory_order_relaxed)) {
         return;
     }
-    entry->running = false;
+    atomic_store_explicit(&entry->running, false, memory_order_relaxed);
     if (entry->wakeup != NULL) {
         entry->wakeup(entry);
     }

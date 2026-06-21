@@ -31,6 +31,7 @@
 
 #include <pthread.h>
 #include <stdbool.h>
+#include <stdatomic.h>
 
 // ==== DEFINES / MACROS ======================================================
 
@@ -43,8 +44,7 @@
  *   };
  */
 #define THREAD_ENTRY(_name, _func, _arg, _wakeup) \
-    {.name = (_name), .func = (_func), .arg = (_arg), .wakeup = (_wakeup), \
-    .tid = 0, .running = false}
+    {.name = (_name), .func = (_func), .arg = (_arg), .wakeup = (_wakeup)}
 
 // ==== TYPEDEFS / STRUCTS ====================================================
 
@@ -54,18 +54,26 @@ typedef void (*thread_wakeup_t)(struct thread_mgr *self);
 
 // 쓰레드 관리 구조체
 typedef struct thread_mgr {
-    const char *name;           // 쓰레드 식별용 이름
+    const char *name;           // 쓰레드 식별용 이름 (15자 까지만)
     thread_func_t func;         // 쓰레드 진입 함수 - thread_mgr_t *self를 받음
     void *arg;                  // 쓰레드 함수 인자값 (self->arg로 접근)
     thread_wakeup_t wakeup;     // stop 시 running=false 세팅 직후 호출됨
 
     pthread_t tid;              // 실행 중 채워지는 핸들
-    bool running;               // 현재 가동 여부
+    _Atomic bool running;       // 현재 가동 여부
 } thread_mgr_t;
 
 // ==== GLOBAL VARIABLES ======================================================
 // ==== STATIC VARIABLES ======================================================
 // ==== FUNCTION PROTOTYPES ===================================================
+
+/**
+ * @brief 쓰레드 관리 구조체 초기화
+ * 
+ * @param threads 쓰레드 관리 정보 구조체 리스트
+ * @param count 쓰레드 개수
+ */
+void init_thread_mgr(thread_mgr_t *threads, size_t count);
 
 /**
  * @brief 단일 쓰레드 실행

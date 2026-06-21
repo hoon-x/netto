@@ -52,11 +52,14 @@
 
 #include <stdatomic.h>
 #include <stdint.h>
+#include <stdalign.h>
+
+#include "macros.h"
 
 // ==== DEFINES / MACROS ======================================================
 // ==== TYPEDEFS / STRUCTS ====================================================
 
-typedef struct event_count {
+typedef struct __attribute__((aligned(CACHE_LINE_SIZE))) event_count {
     _Atomic uint64_t val;
 } event_count_t;
 

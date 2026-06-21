@@ -30,6 +30,7 @@
 // ==== INCLUDES ==============================================================
 
 #include <stdbool.h>
+#include <stdatomic.h>
 
 // ==== DEFINES / MACROS ======================================================
 
@@ -43,15 +44,54 @@
 // ==== TYPEDEFS / STRUCTS ====================================================
 
 typedef struct config {
-	bool running;
+	int max_log_size;
+	int max_backup;
 } config_t;
+
+typedef struct runtime_config {
+	_Atomic bool running;
+} runtime_config_t;
 
 // ==== GLOBAL VARIABLES ======================================================
 
-extern config_t g_config;
+extern runtime_config_t g_runconf;
 
 // ==== STATIC VARIABLES ======================================================
 // ==== FUNCTION PROTOTYPES ===================================================
+
+/**
+ * @brief 런타임 설정 구조체 초기화
+ * 
+ * @param cfg 런타임 설정 정보 구조체 포인터
+ */
+void runtime_config_init(runtime_config_t *cfg);
+
+/**
+ * @brief 설정 정보 관리 구조체 초기화
+ */
+void config_init(void);
+
+/**
+ * @brief 설정 정보 관리 구조체에서 현재 유효한 설정 정보를 가져옴
+ * 
+ * @return const config_t* 설정 정보 구조체
+ */
+const config_t *config_acquire(void);
+
+/**
+ * @brief acquire로 가져온 설정 정보 사용을 끝마쳤음을 나타냄
+ * 
+ * @param cfg acquire로 가져온 설정 정보 구조체 포인터
+ */
+void config_release(const config_t *cfg);
+
+/**
+ * @brief 설정 정보 업데이트
+ * 
+ * @param new_cfg 
+ */
+void config_update(const config_t *new_cfg);
+
 // ==== FUNCTIONS =============================================================
 
 #endif // _CONFIG_H

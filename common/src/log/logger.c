@@ -24,6 +24,10 @@
  * @brief   로깅 유틸리티 소스 파일
  */
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 // ==== INCLUDES ==============================================================
 
 #include <stdio.h>
@@ -37,6 +41,7 @@
 #include <dirent.h>
 #include <libgen.h>
 #include <ctype.h>
+#include <pthread.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -206,7 +211,10 @@ void destroy_daemon_logger(void)
 
 void *daemon_log_consumer_thread(thread_mgr_t *self)
 {
-    while (self->running) {
+    // 쓰레드 이름 설정
+    pthread_setname_np(pthread_self(), self->name);
+
+    while (atomic_load_explicit(&self->running, memory_order_relaxed)) {
         // 우선 시도: 이미 쌓여있는 로그를 빠르게 처리하여 비움
         if (consume_one_daemon_log_entry()) {
             continue;
@@ -221,7 +229,7 @@ void *daemon_log_consumer_thread(thread_mgr_t *self)
             continue;
         }
 
-        if (!self->running) {
+        if (!atomic_load_explicit(&self->running, memory_order_relaxed)) {
             ec_cancel_wait(&g_daemon_logger.ec);
             break;
         }

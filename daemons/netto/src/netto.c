@@ -49,7 +49,7 @@
 // ==== TYPEDEFS / STRUCTS ====================================================
 // ==== GLOBAL VARIABLES ======================================================
 
-config_t g_config;
+runtime_config_t g_runconf;
 
 // ==== STATIC VARIABLES ======================================================
 
@@ -60,7 +60,7 @@ static struct option g_options[] = {
 };
 
 static thread_mgr_t g_threads[] = {
-	THREAD_ENTRY("deamon_log_thread", daemon_log_consumer_thread, NULL, wake_daemon_log_consumer_thread),
+	THREAD_ENTRY("nt_daemon_log", daemon_log_consumer_thread, NULL, wake_daemon_log_consumer_thread),
 };
 
 // ==== FUNCTION PROTOTYPES ===================================================
@@ -155,10 +155,9 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	g_config.running = true;
 	LOG_INFO("Run %s (mode:%s)", NETTO_NAME, is_debug ? "debug" : "normal");
 
-	while (g_config.running) {
+	while (atomic_load_explicit(&g_runconf.running, memory_order_relaxed)) {
 		sleep(1);
 	}
 
@@ -250,7 +249,7 @@ static bool is_running(pid_t *pid)
 static void sig_handler(int signum)
 {
 	if (signum == SIGINT || signum == SIGTERM) {
-		g_config.running = false;
+		atomic_store_explicit(&g_runconf.running, false, memory_order_relaxed);
 	}
 }
 
@@ -371,6 +370,9 @@ static int initialize(bool debug)
 {
 	int ret = -1;
 
+	runtime_config_init(&g_runconf);
+	atomic_store_explicit(&g_runconf.running, true, memory_order_relaxed);
+
 	// 자신의 PID를 파일에 기록
 	if (write_pid_file() != 0) {
 		fprintf(stderr, "[ERROR] Failed to write PID file\n");
@@ -383,6 +385,9 @@ static int initialize(bool debug)
 		return -1;
 	}
 
+	// 설정 정보 관리 구조체 초기화
+	config_init();
+
 	// 데몬 로거 초기화
 	if (init_daemon_logger(LOG_PATH, 10, 0, debug) != 0) {
 		fprintf(stderr, "[ERROR] Failed to initialize daemon logger\n");
@@ -390,10 +395,12 @@ static int initialize(bool debug)
 	}
 
 	do {
+		init_thread_mgr(g_threads, ARRAY_SIZE(g_threads));
+
 		// 등록된 모든 서비스 쓰레드 가동
 		if (start_thread_mgr_all(g_threads, ARRAY_SIZE(g_threads)) != 0) {
 			fprintf(stderr, "[ERROR] Failed to start threads\n");
-			break;	
+			break;
 		}
 
 		ret = 0;
