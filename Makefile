@@ -9,10 +9,11 @@ export BUILD_ARCH		:= $(shell uname -m)
 
 export CC				:= gcc
 export CFLAGS			?= -Wall -Wextra -O2 -MMD -MP
+export EXTRA_CFLAGS		?=
 
 COMMON_DIR	:= common
 DAEMONS_DIR	:= daemons
-BIN_DIR		:= bin
+BUILD_DIR	:= build
 
 export ROOT_DIR			:= $(CURDIR)
 export COMMON_INC_DIR	:= $(ROOT_DIR)/$(COMMON_DIR)/include
@@ -40,21 +41,21 @@ $(DAEMONS): common
 
 collect:
 	@echo "========================================"
-	@echo "--> Collecting Build Artifacts into $(BIN_DIR)/"
+	@echo "--> Collecting Build Artifacts into $(BUILD_DIR)/"
 	@echo "========================================"
-	@mkdir -p $(BIN_DIR)
+	@mkdir -p $(BUILD_DIR)
 	@for daemon in $(DAEMONS); do \
-		$(MAKE) -C $(DAEMONS_DIR)/$$daemon install DEST_DIR=$(ROOT_DIR)/$(BIN_DIR); \
+		$(MAKE) -C $(DAEMONS_DIR)/$$daemon install BUILD_DIR=$(ROOT_DIR)/$(BUILD_DIR); \
 	done
 
-release: clean all
+release:
+	@$(MAKE) clean
+	@$(MAKE) all EXTRA_CFLAGS="-DNDEBUG"
 	@echo "========================================"
 	@echo "--> Release Build Complete"
 	@echo "    VERSION:        $(VERSION)"
 	@echo "    GIT_HASH:       $(GIT_HASH)"
 	@echo "    BUILD_DATE:     $(BUILD_DATE)"
-	@echo "    OS_ID:          $(OS_ID)"
-	@echo "    OS_VER:         $(OS_VER)"
 	@echo "    BUILD_OS:       $(BUILD_OS)"
 	@echo "    BUILD_KERN_VER: $(BUILD_KERN_VER)"
 	@echo "    BUILD_ARCH:     $(BUILD_ARCH)"
@@ -67,6 +68,6 @@ clean:
 		echo "--> Cleaning Daemon: $$daemon"; \
 		$(MAKE) -C $(DAEMONS_DIR)/$$daemon clean; \
 	done
-	@rm -rf $(BIN_DIR)
+	@rm -rf $(BUILD_DIR)
 	@echo "--> Clean complete."
 	

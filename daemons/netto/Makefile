@@ -8,9 +8,13 @@ OBJ_DIR 	:= obj
 INC_DIR		:= include
 BPF_DIR 	:= bpf
 SKEL_DIR	:= skel
+CONF_DIR	:= conf
+
+# Configuration file
+CONF_FILE	:= netto.ini
 
 # Flags
-CFLAGS		+= -I$(INC_DIR) -I$(SKEL_DIR) -I$(COMMON_INC_DIR)
+CFLAGS		+= -I$(INC_DIR) -I$(SKEL_DIR) -I$(COMMON_INC_DIR) $(EXTRA_CFLAGS)
 BPF_CFLAGS	:= -O2 -g -target bpf -I$(INC_DIR)
 LDFLAGS		:=
 LDLIBS		:= -lpthread -lbpf
@@ -69,8 +73,11 @@ $(SKEL_DIR):
 	mkdir -p $@
 
 install: all
-	@cp $(TARGET) $(DEST_DIR)/
-	@echo "    installed: $(TARGET) -> $(DEST_DIR)/"
+	@cp $(TARGET) $(BUILD_DIR)/
+	@mkdir -p $(BUILD_DIR)/$(CONF_DIR)
+	@cp $(CONF_FILE) $(BUILD_DIR)/$(CONF_DIR)/
+	@echo "    installed: $(TARGET) -> $(BUILD_DIR)/"
+	@echo "    installed: $(CONF_FILE) -> $(BUILD_DIR)/$(CONF_DIR)/"
 
 # Pull in header dependencies
 -include $(DEPS)

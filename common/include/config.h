@@ -36,10 +36,12 @@
 
 #define VAR_DIR		"var"
 #define LOG_DIR		"log"
+#define CONF_DIR	"conf"
 
 #define NETTO_NAME  "netto"
 #define PID_PATH    VAR_DIR "/." NETTO_NAME ".pid"
 #define LOG_PATH    LOG_DIR "/" NETTO_NAME ".log"
+#define CONF_PATH	CONF_DIR "/" NETTO_NAME ".ini"
 
 // ==== TYPEDEFS / STRUCTS ====================================================
 
@@ -50,7 +52,10 @@ typedef struct config {
 
 typedef struct runtime_config {
 	_Atomic bool running;
+	bool debug;
 } runtime_config_t;
+
+typedef int (*cfg_parser_fn)(config_t *cfg, const char *section, const char *key, const char *value);
 
 // ==== GLOBAL VARIABLES ======================================================
 
@@ -88,9 +93,22 @@ void config_release(const config_t *cfg);
 /**
  * @brief 설정 정보 업데이트
  * 
- * @param new_cfg 
+ * @param conf_path 설정 파일 경로
+ * @param parser_fn 파싱 콜백 함수
+ * @return int 성공 시 0, 실패 시 -1
  */
-void config_update(const config_t *new_cfg);
+int config_update(const char *conf_path, cfg_parser_fn parser_fn);
+
+/**
+ * @brief netto 설정 파싱 콜백 함수
+ * 
+ * @param cfg 설정 정보 구조체
+ * @param section 섹션
+ * @param key 키
+ * @param value 값
+ * @return int 성공 시 0, 실패 시 -1
+ */
+int netto_config_parser(config_t *cfg, const char *section, const char *key, const char *value);
 
 // ==== FUNCTIONS =============================================================
 

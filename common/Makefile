@@ -4,7 +4,7 @@ SRC_DIR	:= src
 INC_DIR	:= include
 OBJ_DIR	:= obj
 
-CFLAGS	+= -I$(INC_DIR)
+CFLAGS	+= -I$(INC_DIR) $(EXTRA_CFLAGS)
 
 SRCS	:= $(shell find $(SRC_DIR) -name '*.c')
 OBJS	:= $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))

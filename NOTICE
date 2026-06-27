@@ -1,0 +1,28 @@
+Netto
+Copyright 2026 Netto Project Authors
+
+This product includes software developed by third parties. The following
+sections list each component, its origin, and its license.
+
+------------------------------------------------------------------------
+Folly (Facebook Open-source Library)
+------------------------------------------------------------------------
+Copyright (c) Meta Platforms, Inc. and affiliates.
+Licensed under the Apache License, Version 2.0.
+See the LICENSE file in the root of this repository for the full license
+text (same license as this project).
+
+Source: https://github.com/facebook/folly
+Portions of this software (event_count implementation) have been ported
+from C++ to C and are derived from folly/synchronization/EventCount.h.
+
+------------------------------------------------------------------------
+liburcu (Userspace RCU)
+------------------------------------------------------------------------
+Copyright (c) Mathieu Desnoyers and Paul E. McKenney
+Licensed under the GNU Lesser General Public License, Version 2.1.
+Full license text: licenses/LGPL-2.1-or-later.txt
+
+Source: https://liburcu.org/
+This software is dynamically linked at runtime and is not statically
+incorporated into this project's binary.

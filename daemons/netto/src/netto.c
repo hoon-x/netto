@@ -372,6 +372,7 @@ static int initialize(bool debug)
 
 	runtime_config_init(&g_runconf);
 	atomic_store_explicit(&g_runconf.running, true, memory_order_relaxed);
+	g_runconf.debug = debug;
 
 	// 자신의 PID를 파일에 기록
 	if (write_pid_file() != 0) {
@@ -388,11 +389,22 @@ static int initialize(bool debug)
 	// 설정 정보 관리 구조체 초기화
 	config_init();
 
-	// 데몬 로거 초기화
-	if (init_daemon_logger(LOG_PATH, 10, 0, debug) != 0) {
-		fprintf(stderr, "[ERROR] Failed to initialize daemon logger\n");
+	// 설정 파일 로드
+	if (config_update(CONF_PATH, netto_config_parser) != 0) {
+		fprintf(stderr, "[ERROR] Failed to load config file: %s\n", CONF_PATH);
 		return -1;
 	}
+
+	const config_t *cfg = config_acquire();
+
+	// 데몬 로거 초기화
+	if (init_daemon_logger(LOG_PATH, cfg->max_log_size, cfg->max_backup, debug) != 0) {
+		fprintf(stderr, "[ERROR] Failed to initialize daemon logger\n");
+		config_release(cfg);
+		return -1;
+	}
+
+	config_release(cfg);
 
 	do {
 		init_thread_mgr(g_threads, ARRAY_SIZE(g_threads));
